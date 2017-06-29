@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import argparse, subprocess, json, os, sys, base64, binascii, time, hashlib, re, copy, textwrap, logging
 try:
-    from urllib.request import urlopen # Python 3
+    from urllib.request import urlopen, ProxyHandler, build_opener, install_opener # Python 3
 except ImportError:
-    from urllib2 import urlopen # Python 2
+    from urllib2 import urlopen, ProxyHandler, build_opener, install_opener # Python 2
 
 #DEFAULT_CA = "https://acme-staging.api.letsencrypt.org"
 DEFAULT_CA = "https://acme-v01.api.letsencrypt.org"
@@ -12,10 +12,13 @@ LOGGER = logging.getLogger(__name__)
 LOGGER.addHandler(logging.StreamHandler())
 LOGGER.setLevel(logging.INFO)
 
-def get_crt(account_key, csr, acme_dir, log=LOGGER, CA=DEFAULT_CA):
+def get_crt(account_key, csr, acme_dir, log=LOGGER, CA=DEFAULT_CA, proxy=''):
     # helper function base64 encode for jose spec
     def _b64(b):
         return base64.urlsafe_b64encode(b).decode('utf8').replace("=", "")
+
+    if proxy:
+        install_opener(build_opener(ProxyHandler({'http': proxy, 'https': proxy})))
 
     # parse account key to get public key
     log.info("Parsing account key...")
@@ -188,10 +191,11 @@ def main(argv):
     parser.add_argument("--acme-dir", required=True, help="path to the .well-known/acme-challenge/ directory")
     parser.add_argument("--quiet", action="store_const", const=logging.ERROR, help="suppress output except for errors")
     parser.add_argument("--ca", default=DEFAULT_CA, help="certificate authority, default is Let's Encrypt")
+    parser.add_argument("--proxy", default='', help="http proxy, like http://localhost:8118 default is none")
 
     args = parser.parse_args(argv)
     LOGGER.setLevel(args.quiet or LOGGER.level)
-    signed_crt = get_crt(args.account_key, args.csr, args.acme_dir, log=LOGGER, CA=args.ca)
+    signed_crt = get_crt(args.account_key, args.csr, args.acme_dir, log=LOGGER, CA=args.ca, proxy=args.proxy)
     sys.stdout.write(signed_crt)
 
 if __name__ == "__main__": # pragma: no cover
